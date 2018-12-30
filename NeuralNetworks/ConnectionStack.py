@@ -11,7 +11,7 @@ import random
 class NeuralNet(torch.nn.Module):
     def __init__(self, networkNumberOfInputs, hiddenLayerWidths, networkNumberOfOutputs,
                  actionSpace, observationSpace,
-                 obervationLowTensor=None, observationHighTensor=None, actionLowTensor=None, actionHighTensor=None,
+                 observationLowTensor=None, observationHighTensor=None, actionLowTensor=None, actionHighTensor=None
                  ):
         super(NeuralNet, self).__init__()
         layersDict = OrderedDict()
@@ -31,7 +31,7 @@ class NeuralNet(torch.nn.Module):
         self.apply(init_weights)
         self.actionSpace = actionSpace
         self.observationSpace = observationSpace
-        self.observationLowTensor = obervationLowTensor
+        self.observationLowTensor = observationLowTensor
         self.observationHighTensor = observationHighTensor
         self.actionLowTensor = actionLowTensor
         self.actionHighTensor = actionHighTensor
@@ -98,11 +98,20 @@ class NeuralNet(torch.nn.Module):
         self.load_state_dict(torch.load(filepath, map_location=lambda storage, location: storage))
 
     def RescaleObservation(self, observation):
-        return [ (observation[0] - self.observation_low[0])/(self.observation_high[0] - self.observation_low[0]), \
-                 (observation[1] - self.observation_low[1]) / (self.observation_high[1] - self.observation_low[1]), \
-                 (observation[2] - self.observation_low[2]) / (self.observation_high[2] - self.observation_low[2]), \
-                 (observation[3] - self.observation_low[3]) / (self.observation_high[3] - self.observation_low[3]), \
+        """return [ (observation[0] - self.observationLowTensor[0])/(self.observationHighTensor[0] - self.observationLowTensor[0]), \
+                 (observation[1] - self.observationLowTensor[1]) / (self.observationHighTensor[1] - self.observationLowTensor[1]), \
+                 (observation[2] - self.observationLowTensor[2]) / (self.observationHighTensor[2] - self.observationLowTensor[2]), \
+                 (observation[3] - self.observationLowTensor[3]) / (self.observationHighTensor[3] - self.observationLowTensor[3]), \
                 ]
+        """
+        if self.observationLowTensor is None or self.observationHighTensor is None:
+            return observation
+        else:
+            rescaledObservation = []
+            for index in range(len(observation)):
+                rescaledNumber = (observation[index] - self.observationLowTensor[index]) / (self.observationHighTensor[index] - self.observationLowTensor[index])
+                rescaledObservation.append(rescaledNumber)
+            return rescaledObservation
 
     def MoveWeights(self, weightsDeltaList, biasDeltaList, learningRate):
         if len(weightsDeltaList) != len(self.layers) or len (biasDeltaList) != len(self.layers):

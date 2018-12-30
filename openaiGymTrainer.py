@@ -11,6 +11,7 @@ import random
 import ast
 
 import NeuralNetworks.ConnectionStack
+import InspirationFromPeers
 
 
 def main():
@@ -85,11 +86,129 @@ def main():
     ))
 
 
+    if args.testController is not None:
+        agent = NeuralNetworks.ConnectionStack.NeuralNet(
+            networkNumberOfInputs, hiddenLayerWidths, networkNumberOfOutputs,
+            str(actionSpace), str(observationSpace),
+            observationSpaceLow, observationSpaceHigh,
+            actionSpaceLow, actionSpaceHigh
+        )
+        agent.Load(args.testController)
+        rewardSumsList = []
+        for i_episode in range(10):
+            observation = env.reset()
+            rewardSum = 0
+            done = False
+            while not done:
+                env.render()
+                print (observation)
+                reward = 0
+                done = False
+                action = agent.act(observation, reward, done)
+                #action = env.action_space.sample() # Random choice
+                observation, reward, done, info = env.step(action)
+                rewardSum += reward
+                if done:
+                    print ("Breaking! rewardSum = {}".format(rewardSum))
+                    break
+            rewardSumsList.append(rewardSum)
+        print ("main(): rewardSumsList: {}".format(rewardSumsList))
+        averageReward, highestReward = TournamentStatistics(rewardSumsList)
+        print ("main(): averageReward = {}; highestReward = {}".format(averageReward, highestReward))
+        sys.exit()
+
+    evaluator = Evaluator(environment=env, numberOfEpisodesForEvaluation=30)
+
+    numberOfIndividuals = 15
+    eliteProportion = 0.1
+    learningRate = 0.1
+    randomMoveProbability = 0.2
+    randomMoveStandardDeviationDic = {'weight': 1.0, 'bias': 0.3}
+    numberOfCycles = 10
+
+    individualsList = []
+    for individualNdx in range(numberOfIndividuals):
+        individualsList.append(NeuralNetworks.ConnectionStack.NeuralNet(
+            networkNumberOfInputs, hiddenLayerWidths, networkNumberOfOutputs,
+            str(actionSpace), str(observationSpace),
+            observationSpaceLow, observationSpaceHigh,
+            actionSpaceLow, actionSpaceHigh
+        ))
+
+    population = InspirationFromPeers.Population(
+        individualsList=individualsList,
+        eliteProportion=eliteProportion,
+        learningRate=learningRate,
+        randomMoveProbability=randomMoveProbability,
+        randomMoveStandardDeviationDic=randomMoveStandardDeviationDic,
+        individualEvaluator=evaluator
+    )
+
+    with open(os.path.join(args.OutputDirectory, 'stats.csv'), "w+") as statsFile:
+        statsFile.write("Cycle,AverageReward,RewardStandardDeviation,CurrentPopulationHighestReward,ChampionReward\n")
+    highestReward = -sys.float_info.max
+    champion = NeuralNetworks.ConnectionStack.NeuralNet(
+            networkNumberOfInputs, hiddenLayerWidths, networkNumberOfOutputs,
+            str(actionSpace), str(observationSpace),
+            observationSpaceLow, observationSpaceHigh,
+            actionSpaceLow, actionSpaceHigh
+        )
+
+    for cycleNdx in range(numberOfCycles):
+        print ("\n --- Cycle {} ---".format(cycleNdx + 1))
+        population.EvolveOneCycle()
+        averageReward, stdDevReward, maxReward = population.PopulationStatistics()
+
+        with open(os.path.join(args.OutputDirectory, 'stats.csv'), "a+") as statsFile:
+            statsFile.write(str(cycleNdx + 1) + ',' + str(averageReward) + ',' + str(stdDevReward) + ',' + str(maxReward) + ',' + str(highestReward) + '\n')
+
+        if maxReward > highestReward:
+            highestReward = maxReward
+            populationChampion, _ = population.Champion()
+            champion = copy.deepcopy(populationChampion)
+            champion.Save(os.path.join(args.OutputDirectory, \
+                                              'champion_' + str(hiddenLayerWidths) + '_' + str(highestReward)))
 
 def InsideOfParentheses(stringToSearch):
     openingParentheseIndex = stringToSearch.index('(')
     closingParentheseIndex = stringToSearch.index(')')
     return stringToSearch[openingParentheseIndex + 1: closingParentheseIndex]
+
+def TournamentStatistics(tournamentAverageRewards):
+    if len(tournamentAverageRewards) == 0:
+        raise ValueError("TournamentStatistics(): The input list is empty")
+    highestReward = -sys.float_info.max
+    rewardsSum = 0
+    for reward in tournamentAverageRewards:
+        if reward > highestReward:
+            highestReward = reward
+        rewardsSum += reward
+    return rewardsSum / len(tournamentAverageRewards), highestReward
+
+class Evaluator():
+    def __init__(self, environment, numberOfEpisodesForEvaluation):
+        self.environment = environment
+        self.numberOfEpisodesForEvaluation = numberOfEpisodesForEvaluation
+
+    def Evaluate(self, population):
+        individualToRewardDic = {}
+        for individual in population:
+            individualRewardSum = 0
+            for episodeNdx in range(self.numberOfEpisodesForEvaluation):
+                observation = self.environment.reset()
+                episodeRewardSum = 0
+                done = False
+                actionReward = 0
+                while not done:
+                    action = individual.act(observation, actionReward, done)  # Choose an action
+                    observation, actionReward, done, info = self.environment.step(action)  # Perform the action
+                    episodeRewardSum += actionReward
+                    if done:
+                        break
+                individualRewardSum += episodeRewardSum
+            individualToRewardDic[individual] = individualRewardSum / self.numberOfEpisodesForEvaluation
+        return individualToRewardDic
+
 
 
 if __name__ == '__main__':
