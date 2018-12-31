@@ -23,9 +23,16 @@ def main():
     parser.add_argument('--testController', help='The filepath of a neural network to test. Default: None',
                         default=None)
     parser.add_argument('--hiddenLayerWidths', help="The tuple of hidden layers widths. Default:'(8, 5)'", default='(8, 5)')
+    parser.add_argument('--numberOfIndividuals', help="The number of individuals in the population. Default: 100", type=int, default=100)
+    parser.add_argument('--eliteProportion', help="The proportion of the population to be considered as inspiring. Default: 0.1", type=float, default=0.1)
+    parser.add_argument('--learningRate', help="The proportion of the delta between the inspiring peer and the individual to be moved. Default: 0.1", type=float, default=0.1)
+    parser.add_argument('--randomMoveProbability', help="The probability to do a random move. Default: 0.2", type=float, default=0.2)
+    parser.add_argument('--randomMoveStandardDeviationDic', help="The standard deviations of a random move. Default: {'weight': 1.0, 'bias': 0.3}", default="{'weight': 1.0, 'bias': 0.3}")
+    parser.add_argument('--numberOfCycles', help="The number of cycles. Default: 20", type=int, default=20)
     args = parser.parse_args()
 
     hiddenLayerWidths = ast.literal_eval(args.hiddenLayerWidths)
+    args.randomMoveStandardDeviationDic = ast.literal_eval(args.randomMoveStandardDeviationDic)
 
     env = gym.make(args.OpenAIGymEnvironment)
     # Extract action space data
@@ -119,15 +126,15 @@ def main():
 
     evaluator = Evaluator(environment=env, numberOfEpisodesForEvaluation=30)
 
-    numberOfIndividuals = 15
-    eliteProportion = 0.1
-    learningRate = 0.1
-    randomMoveProbability = 0.2
-    randomMoveStandardDeviationDic = {'weight': 1.0, 'bias': 0.3}
-    numberOfCycles = 10
+    #numberOfIndividuals = 100
+    #eliteProportion = 0.1
+    #learningRate = 0.1
+    #randomMoveProbability = 0.2
+    #randomMoveStandardDeviationDic = {'weight': 1.0, 'bias': 0.3}
+    numberOfCycles = 20
 
     individualsList = []
-    for individualNdx in range(numberOfIndividuals):
+    for individualNdx in range(args.numberOfIndividuals):
         individualsList.append(NeuralNetworks.ConnectionStack.NeuralNet(
             networkNumberOfInputs, hiddenLayerWidths, networkNumberOfOutputs,
             str(actionSpace), str(observationSpace),
@@ -137,10 +144,10 @@ def main():
 
     population = InspirationFromPeers.Population(
         individualsList=individualsList,
-        eliteProportion=eliteProportion,
-        learningRate=learningRate,
-        randomMoveProbability=randomMoveProbability,
-        randomMoveStandardDeviationDic=randomMoveStandardDeviationDic,
+        eliteProportion=args.eliteProportion,
+        learningRate=args.learningRate,
+        randomMoveProbability=args.randomMoveProbability,
+        randomMoveStandardDeviationDic=args.randomMoveStandardDeviationDic,
         individualEvaluator=evaluator
     )
 
@@ -159,15 +166,17 @@ def main():
         population.EvolveOneCycle()
         averageReward, stdDevReward, maxReward = population.PopulationStatistics()
 
-        with open(os.path.join(args.OutputDirectory, 'stats.csv'), "a+") as statsFile:
-            statsFile.write(str(cycleNdx + 1) + ',' + str(averageReward) + ',' + str(stdDevReward) + ',' + str(maxReward) + ',' + str(highestReward) + '\n')
-
         if maxReward > highestReward:
             highestReward = maxReward
             populationChampion, _ = population.Champion()
             champion = copy.deepcopy(populationChampion)
             champion.Save(os.path.join(args.OutputDirectory, \
                                               'champion_' + str(hiddenLayerWidths) + '_' + str(highestReward)))
+
+        with open(os.path.join(args.OutputDirectory, 'stats.csv'), "a+") as statsFile:
+            statsFile.write(str(cycleNdx + 1) + ',' + str(averageReward) + ',' + str(stdDevReward) + ',' + str(maxReward) + ',' + str(highestReward) + '\n')
+
+
 
 def InsideOfParentheses(stringToSearch):
     openingParentheseIndex = stringToSearch.index('(')
