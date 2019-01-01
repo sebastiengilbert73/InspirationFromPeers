@@ -113,7 +113,8 @@ def main():
                 print (observation)
                 reward = 0
                 done = False
-                action = agent.act(observation, reward, done)
+                action = agent.act(observation, reward, done).detach().numpy()
+                print ("action = {}".format(action))
                 #action = env.action_space.sample() # Random choice
                 observation, reward, done, info = env.step(action)
                 rewardSum += reward
