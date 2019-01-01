@@ -34,7 +34,7 @@ class Population():
     def EvolveOneCycle(self):
         averageReward, stdDevReward, maxReward = self.PopulationStatistics()
         if self.printToConsole:
-            print ("averageReward = {}\t; stdDevReward = {}\t, maxReward = {}".format(averageReward, stdDevReward, maxReward))
+            print ("Initial state: averageReward = {}\t; stdDevReward = {}\t, maxReward = {}".format(averageReward, stdDevReward, maxReward))
 
         eliteList = self.Elite()
 

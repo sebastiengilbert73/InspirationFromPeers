@@ -26,7 +26,9 @@ def main():
     parser.add_argument('--numberOfIndividuals', help="The number of individuals in the population. Default: 100", type=int, default=100)
     parser.add_argument('--eliteProportion', help="The proportion of the population to be considered as inspiring. Default: 0.1", type=float, default=0.1)
     parser.add_argument('--learningRate', help="The proportion of the delta between the inspiring peer and the individual to be moved. Default: 0.1", type=float, default=0.1)
-    parser.add_argument('--randomMoveProbability', help="The probability to do a random move. Default: 0.2", type=float, default=0.2)
+    parser.add_argument('--randomMoveInitialProbability', help="The initial probability to do a random move. Default: 0.8", type=float, default=0.8)
+    parser.add_argument('--randomMoveFinalProbability', help="The final probability to do a random move. Default: 0.2", type=float, default=0.2)
+    parser.add_argument('--randomMoveRampDownTime', help="The number of cycles to go down to the final random move probability. Default=20", type=int, default=20)
     parser.add_argument('--randomMoveStandardDeviationDic', help="The standard deviations of a random move. Default: {'weight': 1.0, 'bias': 0.3}", default="{'weight': 1.0, 'bias': 0.3}")
     parser.add_argument('--numberOfCycles', help="The number of cycles. Default: 20", type=int, default=20)
     args = parser.parse_args()
@@ -126,13 +128,6 @@ def main():
 
     evaluator = Evaluator(environment=env, numberOfEpisodesForEvaluation=30)
 
-    #numberOfIndividuals = 100
-    #eliteProportion = 0.1
-    #learningRate = 0.1
-    #randomMoveProbability = 0.2
-    #randomMoveStandardDeviationDic = {'weight': 1.0, 'bias': 0.3}
-    numberOfCycles = 20
-
     individualsList = []
     for individualNdx in range(args.numberOfIndividuals):
         individualsList.append(NeuralNetworks.ConnectionStack.NeuralNet(
@@ -142,11 +137,12 @@ def main():
             actionSpaceLow, actionSpaceHigh
         ))
 
+
     population = InspirationFromPeers.Population(
         individualsList=individualsList,
         eliteProportion=args.eliteProportion,
         learningRate=args.learningRate,
-        randomMoveProbability=args.randomMoveProbability,
+        randomMoveProbability=args.randomMoveInitialProbability,
         randomMoveStandardDeviationDic=args.randomMoveStandardDeviationDic,
         individualEvaluator=evaluator
     )
@@ -161,10 +157,15 @@ def main():
             actionSpaceLow, actionSpaceHigh
         )
 
-    for cycleNdx in range(numberOfCycles):
+    for cycleNdx in range(args.numberOfCycles):
         print ("\n --- Cycle {} ---".format(cycleNdx + 1))
         population.EvolveOneCycle()
         averageReward, stdDevReward, maxReward = population.PopulationStatistics()
+
+        randomMoveProbability = args.randomMoveInitialProbability - (args.randomMoveInitialProbability - args.randomMoveFinalProbability) * \
+                                float(cycleNdx) / args.randomMoveRampDownTime
+        print ("randomMoveProbability = {}".format(randomMoveProbability))
+        population.randomMoveProbability = randomMoveProbability
 
         if maxReward > highestReward:
             highestReward = maxReward
