@@ -12,14 +12,13 @@ class Population():
     def __init__(self,
                  individualsList,
                  # The individuals must implement:
-                 #  individual.PerturbateAllWeights()
-                 #  individual.DeltasWith()
-                 #  individual.MoveWeights()
+                 #  individual.RandomMove
+                 #  individual.MoveTowards(inspiringPeer, self.learningRate)
                  eliteProportion,
                  learningRate,
                  randomMoveProbability,
                  randomMoveStandardDeviationDic,
-                 individualEvaluator,
+                 individualEvaluator, # Must implement: individualEvaluator.Evaluate(self.population)
                  printToConsole=True
                  ):
         self.population = individualsList
@@ -44,14 +43,12 @@ class Population():
             # Decide if we'll do a random move or imitate an idol
             weDoARandomMove = numpy.random.random() < self.randomMoveProbability
             if weDoARandomMove:
-                individual.PerturbateAllWeights(self.randomMoveStandardDeviationDic['weight'], self.randomMoveStandardDeviationDic['bias'])
+                individual.RandomMove(self.randomMoveStandardDeviationDic)
                 nextPopulation.append(individual)
             else:  # We are inspired by a peer
                 inspiringPeer = random.choice(eliteList)
-                # Get the difference between the inspiring peer and the individual
-                weightDeltasList, biasDeltasList = individual.DeltasWith(inspiringPeer)
                 # Move in the direction of the inspiring peer
-                individual.MoveWeights(weightDeltasList, biasDeltasList, self.learningRate)
+                individual.MoveTowards(inspiringPeer, self.learningRate)
                 nextPopulation.append(individual)
         self.population = nextPopulation
         self.individualToRewardDic = self.individualEvaluator.Evaluate(self.population)

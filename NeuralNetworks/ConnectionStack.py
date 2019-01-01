@@ -91,6 +91,14 @@ class NeuralNet(torch.nn.Module):
         for layerNdx in range(len(self.layers)):
             self.PerturbateWeights(layerNdx, weightsDeltaSigma, biasDeltaSigma)
 
+    def RandomMove(self, randomMoveStandardDeviationDic):
+        self.PerturbateAllWeights(randomMoveStandardDeviationDic['weight'],
+                               randomMoveStandardDeviationDic['bias'])
+
+    def MoveTowards(self, inspiringPeer, learningRate):
+        weightDeltasList, biasDeltasList = self.DeltasWith(inspiringPeer)
+        self.MoveWeights(weightDeltasList, biasDeltasList, learningRate)
+
     def Save(self, filepath):
         torch.save(self.state_dict(), filepath)
 
