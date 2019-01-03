@@ -35,6 +35,8 @@ class NeuralNet(torch.nn.Module):
         self.observationHighTensor = observationHighTensor
         self.actionLowTensor = actionLowTensor
         self.actionHighTensor = actionHighTensor
+        self.networkNumberOfInputs = networkNumberOfInputs
+        self.networkNumberOfOutputs = networkNumberOfOutputs
 
 
     def forward(self, inputs):
@@ -56,6 +58,10 @@ class NeuralNet(torch.nn.Module):
         return layer
 
     def act(self, observation, reward, done):
+        if self.observationSpace.startswith('Discrete'):
+            observationArr = numpy.zeros(self.networkNumberOfInputs)
+            observationArr[observation] = 1.
+            observation = observationArr
         inputTensor = torch.Tensor(self.RescaleObservation(observation))
         outputTensor = self.forward(inputTensor)
         if self.actionSpace.startswith('Discrete'):
@@ -63,9 +69,9 @@ class NeuralNet(torch.nn.Module):
             return highestNdx
         elif self.actionSpace.startswith('Box'):
             if self.actionLowTensor is not None and self.actionHighTensor is not None:
-                return self.actionLowTensor + outputTensor * (self.actionHighTensor - self.actionLowTensor)
+                return (self.actionLowTensor + outputTensor * (self.actionHighTensor - self.actionLowTensor)).detach().numpy()
             else:
-                return outputTensor
+                return outputTensor.detach().numpy()
         else:
             raise NotImplementedError("NeuralNet.forward(): Unimplemented action space '{}'".forward(self.actionSpace))
 

@@ -31,6 +31,7 @@ def main():
     parser.add_argument('--randomMoveRampDownTime', help="The number of cycles to go down to the final random move probability. Default=20", type=int, default=20)
     parser.add_argument('--randomMoveStandardDeviationDic', help="The standard deviations of a random move. Default: {'weight': 1.0, 'bias': 0.3}", default="{'weight': 1.0, 'bias': 0.3}")
     parser.add_argument('--numberOfCycles', help="The number of cycles. Default: 20", type=int, default=20)
+    parser.add_argument('--numberOfEpisodesForEvaluation', help="The number of episode to evaluate an individual. Default: 30", type=int, default=30)
     args = parser.parse_args()
 
     hiddenLayerWidths = ast.literal_eval(args.hiddenLayerWidths)
@@ -40,7 +41,7 @@ def main():
     # Extract action space data
     actionSpace = env.action_space
     if str(actionSpace).startswith('Discrete'):
-        networkNumberOfOutputs = int(InsideOfParentheses(str(actionSpace)))
+        networkNumberOfOutputs = actionSpace.n #int(InsideOfParentheses(str(actionSpace)))
         actionSpaceLow = None
         actionSpaceHigh = None
     elif str(actionSpace).startswith('Box'):
@@ -66,7 +67,7 @@ def main():
     # Extract observation space data
     observationSpace = env.observation_space
     if str(observationSpace).startswith('Discrete'):
-        networkNumberOfInputs = int(InsideOfParentheses(str(observationSpace)))
+        networkNumberOfInputs = observationSpace.n # int(InsideOfParentheses(str(observationSpace)))
         observationSpaceLow = None
         observationSpaceHigh = None
     elif str(observationSpace).startswith('Box'):
@@ -113,7 +114,7 @@ def main():
                 print (observation)
                 reward = 0
                 done = False
-                action = agent.act(observation, reward, done).detach().numpy()
+                action = agent.act(observation, reward, done)
                 print ("action = {}".format(action))
                 #action = env.action_space.sample() # Random choice
                 observation, reward, done, info = env.step(action)
@@ -127,6 +128,9 @@ def main():
         print ("main(): averageReward = {}; highestReward = {}".format(averageReward, highestReward))
         sys.exit()
 
+    numberOfDiscreteObservations = 0
+    if str(observationSpace).startswith('Discrete'):
+        numberOfDiscreteObservations = networkNumberOfInputs
     evaluator = Evaluator(environment=env, numberOfEpisodesForEvaluation=30)
 
     individualsList = []
@@ -165,6 +169,8 @@ def main():
 
         randomMoveProbability = args.randomMoveInitialProbability - (args.randomMoveInitialProbability - args.randomMoveFinalProbability) * \
                                 float(cycleNdx) / args.randomMoveRampDownTime
+        if randomMoveProbability < args.randomMoveFinalProbability:
+            randomMoveProbability = args.randomMoveFinalProbability
         print ("randomMoveProbability = {}".format(randomMoveProbability))
         population.randomMoveProbability = randomMoveProbability
 
@@ -173,7 +179,7 @@ def main():
             populationChampion, _ = population.Champion()
             champion = copy.deepcopy(populationChampion)
             champion.Save(os.path.join(args.OutputDirectory, \
-                                              'champion_' + str(hiddenLayerWidths) + '_' + str(highestReward)))
+                                              'champion_' + str(hiddenLayerWidths).replace(" ", "") + '_' + str(highestReward)))
 
         with open(os.path.join(args.OutputDirectory, 'stats.csv'), "a+") as statsFile:
             statsFile.write(str(cycleNdx + 1) + ',' + str(averageReward) + ',' + str(stdDevReward) + ',' + str(maxReward) + ',' + str(highestReward) + '\n')
@@ -201,6 +207,7 @@ class Evaluator():
         self.environment = environment
         self.numberOfEpisodesForEvaluation = numberOfEpisodesForEvaluation
 
+
     def Evaluate(self, population):
         individualToRewardDic = {}
         for individual in population:
@@ -211,7 +218,7 @@ class Evaluator():
                 done = False
                 actionReward = 0
                 while not done:
-                    action = individual.act(observation, actionReward, done)  # Choose an action
+                    action = individual.act(observation, actionReward, done) # Choose an action
                     observation, actionReward, done, info = self.environment.step(action)  # Perform the action
                     episodeRewardSum += actionReward
                     if done:
