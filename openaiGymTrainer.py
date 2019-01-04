@@ -32,10 +32,13 @@ def main():
     parser.add_argument('--randomMoveStandardDeviationDic', help="The standard deviations of a random move. Default: {'weight': 1.0, 'bias': 0.3}", default="{'weight': 1.0, 'bias': 0.3}")
     parser.add_argument('--numberOfCycles', help="The number of cycles. Default: 20", type=int, default=20)
     parser.add_argument('--numberOfEpisodesForEvaluation', help="The number of episode to evaluate an individual. Default: 30", type=int, default=30)
+    parser.add_argument('--lazynessPenaltyDic', help="The additional penalty for a lazy approach. The value should be a negative reward. Ex.: '{-200.0: -2000.0}'. Default: None", default=None)
     args = parser.parse_args()
 
     hiddenLayerWidths = ast.literal_eval(args.hiddenLayerWidths)
     args.randomMoveStandardDeviationDic = ast.literal_eval(args.randomMoveStandardDeviationDic)
+    if args.lazynessPenaltyDic is not None:
+        args.lazynessPenaltyDic = ast.literal_eval(args.lazynessPenaltyDic)
 
     env = gym.make(args.OpenAIGymEnvironment)
     # Extract action space data
@@ -128,10 +131,11 @@ def main():
         print ("main(): averageReward = {}; highestReward = {}".format(averageReward, highestReward))
         sys.exit()
 
-    numberOfDiscreteObservations = 0
-    if str(observationSpace).startswith('Discrete'):
-        numberOfDiscreteObservations = networkNumberOfInputs
-    evaluator = Evaluator(environment=env, numberOfEpisodesForEvaluation=30)
+    #numberOfDiscreteObservations = 0
+    #if str(observationSpace).startswith('Discrete'):
+    #    numberOfDiscreteObservations = networkNumberOfInputs
+    evaluator = Evaluator(environment=env, numberOfEpisodesForEvaluation= args.numberOfEpisodesForEvaluation,
+                          lazynessPenaltyDic=args.lazynessPenaltyDic)
 
     individualsList = []
     for individualNdx in range(args.numberOfIndividuals):
@@ -203,9 +207,10 @@ def TournamentStatistics(tournamentAverageRewards):
     return rewardsSum / len(tournamentAverageRewards), highestReward
 
 class Evaluator():
-    def __init__(self, environment, numberOfEpisodesForEvaluation):
+    def __init__(self, environment, numberOfEpisodesForEvaluation, lazynessPenaltyDic):
         self.environment = environment
         self.numberOfEpisodesForEvaluation = numberOfEpisodesForEvaluation
+        self.lazynessPenaltyDic = lazynessPenaltyDic
 
 
     def Evaluate(self, population):
@@ -223,6 +228,9 @@ class Evaluator():
                     episodeRewardSum += actionReward
                     if done:
                         break
+                if self.lazynessPenaltyDic is not None:
+                    if episodeRewardSum in self.lazynessPenaltyDic: # This is a lazy solution: add the penalty (a negative reward)
+                        episodeRewardSum += self.lazynessPenaltyDic[episodeRewardSum]
                 individualRewardSum += episodeRewardSum
             individualToRewardDic[individual] = individualRewardSum / self.numberOfEpisodesForEvaluation
         return individualToRewardDic
